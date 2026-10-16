@@ -1,4 +1,4 @@
-package ru.vsu.cs.course2.task1;
+package model;
 
 public enum Category {
     FROZEN("Мороженое", TemperatureMode.FROZEN, 180);

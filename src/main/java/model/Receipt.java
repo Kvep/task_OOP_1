@@ -1,4 +1,7 @@
-package ru.vsu.cs.course2.task1;
+package model;
+
+import service.Batch;
+import service.StockOperation;
 
 import java.time.LocalDate;
 

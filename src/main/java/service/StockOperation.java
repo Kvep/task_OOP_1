@@ -1,4 +1,9 @@
-package ru.vsu.cs.course2.task1;
+package service;
+
+import model.Receipt;
+import model.Reservation;
+import model.ReservationCancel;
+import model.Shipment;
 
 public sealed interface StockOperation
         permits Receipt, Shipment, Reservation, ReservationCancel {

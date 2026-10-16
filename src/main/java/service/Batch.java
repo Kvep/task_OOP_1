@@ -1,4 +1,6 @@
-package ru.vsu.cs.course2.task1;
+package service;
+
+import model.Product;
 
 import java.time.LocalDate;
 import java.util.Objects;
