@@ -39,7 +39,7 @@ public final class Warehouse {
         TemperatureMode required = batch.product().category().tempMode();
         if (!zoneMode.isCompatibleWith(required)) {
             throw new IncompatibleTemperatureException(
-                "Партия " + batch.number() + "требует " + required + ", а зона склада '"
+                "Партия " + batch.number().value() + " требует " + required + ", а зона склада '"
                         + name + "' - " + zoneMode);
         }
 
@@ -57,13 +57,12 @@ public final class Warehouse {
 
         List<Batch> available = batches.getOrDefault(product, List.of());
 
-        int totalAvailable = available.stream().filter(b -> !b.isExpireON(onDate))
+        int totalAvailable = available.stream().filter(b -> !b.isExpiredOn(onDate))
                 .mapToInt(Batch::quantity).sum();
 
         if (totalAvailable == 0) {
             throw new InsufficientStockException(
                     "Товар '" + product.name() + "' отсутствует на " + onDate);
-            )
         }
         if (totalAvailable < quantity) {
             throw new InsufficientStockException(
@@ -81,10 +80,8 @@ public final class Warehouse {
 
         for (Batch batch : sorted) {
             if (remaining == 0) break;
-            if (batch.isExpireON(onDate)) {
-                throw new ExpiredGoodsException(
-                        "Ближайшая партия " + batch.number().value() + " просрочена на "
-                                + onDate + " (срок до " + batch.expiresOn() + ")" );
+            if (batch.isExpiredOn(onDate)) {
+                continue;
             }
 
             int take = Math.min(remaining, batch.quantity());
@@ -95,13 +92,27 @@ public final class Warehouse {
         }
 
         // Обновляем состояние: уменьшаем или удаляем партии
-        applyShipment(product, shipped, onDate);
+        applyShipment(product, shipped);
 
         journal.add(new Shipment(product, List.copyOf(shipped), onDate));
         return List.copyOf(shipped);
     }
 
-    private void applyShipment(Product product, List<Batch> shipped, LocalDate onDate) {
+    // Метод отгрузки по резерву
+    public void shipReserved(long reservationId, LocalDate now) throws WarehouseException {
+        Reservation r = reservations.stream().filter(x -> x.id() == reservationId)
+                .findFirst().orElseThrow(() -> new WarehouseException("Резерв #" + reservationId + " не найден"));
+
+        if (r.isExpired(now.atStartOfDay())) {
+            throw new exception.ReservationTimeoutException("Резерв #" + reservationId + " истёк " + r.expires());
+        }
+
+        // Снимаем резерв и отгружаем
+        reservations.remove(r);
+        shipFefo(r.product(), r.quantity(), now);
+    }
+
+    private void applyShipment(Product product, List<Batch> shipped) {
         List<Batch> stock = batches.get(product);
         for (Batch taken : shipped) {
             Batch source = stock.stream().filter(b -> b.number().equals(taken.number()))
@@ -122,7 +133,7 @@ public final class Warehouse {
     public int stockOn(Product product, LocalDate date) {
         Objects.requireNonNull(product, "product");
         Objects.requireNonNull(date, "date");
-        return batches.getOrDefault(product, List.of()).stream().filter(b -> !b.isExpireON(date))
+        return batches.getOrDefault(product, List.of()).stream().filter(b -> !b.isExpiredOn(date))
                 .mapToInt(Batch::quantity).sum();
     }
 
@@ -130,7 +141,7 @@ public final class Warehouse {
 
     public List<Batch> expiredOn(LocalDate date) {
         Objects.requireNonNull(date,"date");
-        return batches.values().stream().flatMap(List::stream).filter(b -> b.isExpireON(date))
+        return batches.values().stream().flatMap(List::stream).filter(b -> b.isExpiredOn(date))
                 .sorted().toList();
     }
 
@@ -203,7 +214,7 @@ public final class Warehouse {
 
         for (Reservation r : expired) {
             reservations.remove(r);
-            journal.add(new ReservationCancel(r.id(), moment, "истёк таймаут", now));
+            journal.add(new ReservationCancel(r.id(), moment, now));
         }
         return expired.size();
     }
@@ -227,7 +238,7 @@ public final class Warehouse {
     }
 
     //Доступ ко всем активным разервам в виде списка
-    public List<Reservation> activeReservation() {
+    public List<Reservation> activeReservations() {
         return List.copyOf(reservations);
     }
 

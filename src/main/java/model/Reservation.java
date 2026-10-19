@@ -1,7 +1,5 @@
 package model;
 
-import service.StockOperation;
-
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -29,6 +27,6 @@ public record Reservation(
     @Override
     public String describe() {
         return "Резерв " + id + " на " + product.name() + ", "
-                + quantity + "шт., до" + expires;
+                + quantity + " шт., до" + expires;
     }
 }

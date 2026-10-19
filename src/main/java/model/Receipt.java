@@ -1,8 +1,5 @@
 package model;
 
-import service.Batch;
-import service.StockOperation;
-
 import java.time.LocalDate;
 
 public record Receipt(Batch batch, LocalDate date) implements StockOperation {

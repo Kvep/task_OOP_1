@@ -1,7 +1,7 @@
 package exception;
 
 public class ReservationTimeoutException extends WarehouseException {
-    private ReservationTimeoutException(String message) {
+    public ReservationTimeoutException(String message) {
         super(message);
     }
 }

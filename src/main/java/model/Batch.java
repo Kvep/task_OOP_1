@@ -1,16 +1,7 @@
-package service;
-
-import model.Product;
+package model;
 
 import java.time.LocalDate;
 import java.util.Objects;
-
-public record BatchNumber(String value) {
-    public BatchNumber {
-        Objects.requireNonNull(value);
-        if (value.isBlank()) throw new IllegalArgumentException("Отсутствует номер партии.");
-    }
-}
 
 public record Batch (
     BatchNumber number,
@@ -31,7 +22,7 @@ public record Batch (
             throw new IllegalArgumentException("Количество должно быть положительным.");
     }
 
-    public boolean isExpireON(LocalDate date) {
+    public boolean isExpiredOn(LocalDate date) {
         return expiresOn.isBefore(date);
     }
 

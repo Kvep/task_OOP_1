@@ -1,7 +1,5 @@
 package model;
 
-import service.StockOperation;
-
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 

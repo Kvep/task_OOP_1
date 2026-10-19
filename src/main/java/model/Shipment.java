@@ -1,8 +1,5 @@
 package model;
 
-import service.Batch;
-import service.StockOperation;
-
 import java.time.LocalDate;
 import java.util.List;
 
@@ -20,6 +17,6 @@ public record Shipment(Product product, List<Batch> shipped, LocalDate date) imp
     @Override
     public String describe() {
         return "Отгрузка " + product.name() + ": " + totalQuantity()
- + totalQuantity() + "шт. из " + shipped.size() + "партий(и)";
+                + " шт. из " + shipped.size() + "партий(и)";
     }
 }

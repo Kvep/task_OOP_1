@@ -1,9 +1,4 @@
-package service;
-
-import model.Receipt;
-import model.Reservation;
-import model.ReservationCancel;
-import model.Shipment;
+package model;
 
 public sealed interface StockOperation
         permits Receipt, Shipment, Reservation, ReservationCancel {

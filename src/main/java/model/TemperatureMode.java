@@ -21,5 +21,12 @@ public enum TemperatureMode {
         return temperatureCelsius;
     }
 
-    //public boolean is
+    public boolean isCompatibleWith(TemperatureMode required) {
+        return this == required;
+    }
+
+    @Override
+    public String toString() {
+        return title + " (" + temperatureCelsius + "°C)";
+    }
 }
