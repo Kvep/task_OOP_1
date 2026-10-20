@@ -2,6 +2,7 @@ package service;
 
 import exception.IncompatibleTemperatureException;
 import exception.InsufficientStockException;
+import exception.ReservationTimeoutException;
 import exception.WarehouseException;
 import model.*;
 
@@ -10,6 +11,10 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
 
+/**
+ * Склад с определенным температурным режимом.
+ * Управляет партиями товаров, поддерживает FEFO, резервы и отчеты.
+ */
 public final class Warehouse {
     private final String name;
     private final TemperatureMode zoneMode;
@@ -31,7 +36,13 @@ public final class Warehouse {
         return zoneMode;
     }
 
-    /* Принимает партию на склад */
+    /**
+     * Принимает партию на склад.
+     * Проверяет совместимость температурного режима.
+     *
+     * @param batch принимаемая партия
+     * @throws IncompatibleTemperatureException если режим несовместим
+     */
 
     public void receive(Batch batch) throws WarehouseException {
         Objects.requireNonNull(batch, "batch");
@@ -46,7 +57,15 @@ public final class Warehouse {
         journal.add(new Receipt(batch, LocalDate.now()));
     }
 
-    /* Отгрузка по FEFO */
+    /**
+     * Отгружает товар по правилу FEFO (First Expired, First Out).
+     *
+     * @param product товар
+     * @param quantity количество для отгрузки
+     * @param onDate дата отгрузки
+     * @return список партий, из которых был списан товар
+     * @throws InsufficientStockException если не хватает товара
+     */
     public List<Batch> shipFefo(Product product, int quantity, LocalDate onDate) throws WarehouseException {
         Objects.requireNonNull(product, "product");
         Objects.requireNonNull(onDate, "onDate");
@@ -97,7 +116,14 @@ public final class Warehouse {
         return List.copyOf(shipped);
     }
 
-    // Метод отгрузки по резерву
+    /**
+     * Отгружает зарезервированный товар.
+     *
+     * @param reservationId ID резерва
+     * @param now текущая дата
+     * @throws ReservationTimeoutException если резерв истек
+     * @throws InsufficientStockException если товара физически нет
+     */
     public void shipReserved(long reservationId, LocalDate now) throws WarehouseException {
         Reservation r = reservations.stream().filter(x -> x.id() == reservationId)
                 .findFirst().orElseThrow(() -> new WarehouseException("Резерв #" + reservationId + " не найден"));
@@ -133,7 +159,13 @@ public final class Warehouse {
         }
     }
 
-    //Остаток товара на заданную дату (без учёта просроченных)
+    /**
+     * Возвращает остаток не просроченного товара на дату.
+     *
+     * @param product товар
+     * @param date дата
+     * @return количество штук
+     */
     public int stockOn(Product product, LocalDate date) {
         Objects.requireNonNull(product, "product");
         Objects.requireNonNull(date, "date");
@@ -141,8 +173,9 @@ public final class Warehouse {
                 .mapToInt(Batch::quantity).sum();
     }
 
-    //Список партий, просроченных на заданную дату
-
+    /**
+     * Возвращает список всех просроченных партий на дату.
+     */
     public List<Batch> expiredOn(LocalDate date) {
         Objects.requireNonNull(date,"date");
         return batches.values().stream().flatMap(List::stream).filter(b -> b.isExpiredOn(date))
@@ -161,7 +194,10 @@ public final class Warehouse {
                 .sorted().toList();
     }
 
-    // Отчёт «сгорит в ближайшие N дней»: сумма потерь в копейках по всем товарам склада
+    /**
+     * Считает потенциальные потери в копейках для товаров,
+     * истекающих в ближайшие N дней.
+     */
     public long potentialLossKopecks(LocalDate date, int days) {
         Objects.requireNonNull(date, "date");
         if (days < 0) {
@@ -176,7 +212,9 @@ public final class Warehouse {
         return total;
     }
 
-    //Резервирует указанное количество товара под заказ с таймаутом
+    /**
+     * Создает резерв на товар.
+     */
     public Reservation reserve(Product product, int quantity, LocalDate now, Duration time) throws WarehouseException {
         Objects.requireNonNull(product, "product");
         Objects.requireNonNull(now, "now");
@@ -235,7 +273,9 @@ public final class Warehouse {
         journal.add(new ReservationCancel(reservationId, now.atStartOfDay(), now));
     }
 
-    //Доступ ко всем партиям склада в виде списка
+    /**
+     * Возвращает неизменяемый список всех партий склада.
+     */
     public List<Batch> allBatches() {
         return batches.values().stream().flatMap(List::stream).sorted().toList();
     }

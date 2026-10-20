@@ -1,5 +1,8 @@
 package model;
 
+/**
+ * Температурный режим хранения (зоны склада или категории товара).
+ */
 public enum TemperatureMode {
     FROZEN("Морозильный", -18),
     CHILLED("Охлаждаемый", 5),
@@ -21,6 +24,12 @@ public enum TemperatureMode {
         return temperatureCelsius;
     }
 
+    /**
+     * Проверяет совместимость текущего режима с требуемым.
+     *
+     * @param required требуемый режим
+     * @return true, если режимы совпадают
+     */
     public boolean isCompatibleWith(TemperatureMode required) {
         return this == required;
     }
