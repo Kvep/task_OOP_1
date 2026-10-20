@@ -1,6 +1,5 @@
 package service;
 
-import exception.ExpiredGoodsException;
 import exception.IncompatibleTemperatureException;
 import exception.InsufficientStockException;
 import exception.WarehouseException;
@@ -28,7 +27,7 @@ public final class Warehouse {
         return name;
     }
 
-    public TemperatureMode getZoneMode() {
+    public TemperatureMode zoneMode() {
         return zoneMode;
     }
 
@@ -36,7 +35,7 @@ public final class Warehouse {
 
     public void receive(Batch batch) throws WarehouseException {
         Objects.requireNonNull(batch, "batch");
-        TemperatureMode required = batch.product().category().tempMode();
+        TemperatureMode required = batch.product().category().getTempMode();
         if (!zoneMode.isCompatibleWith(required)) {
             throw new IncompatibleTemperatureException(
                 "Партия " + batch.number().value() + " требует " + required + ", а зона склада '"
@@ -57,17 +56,17 @@ public final class Warehouse {
 
         List<Batch> available = batches.getOrDefault(product, List.of());
 
-        int totalAvailable = available.stream().filter(b -> !b.isExpiredOn(onDate))
+        int freshProducts = available.stream().filter(b -> !b.isExpiredOn(onDate))
                 .mapToInt(Batch::quantity).sum();
 
-        if (totalAvailable == 0) {
+        if (freshProducts == 0) { // Товар отсутствует
             throw new InsufficientStockException(
                     "Товар '" + product.name() + "' отсутствует на " + onDate);
         }
-        if (totalAvailable < quantity) {
+        if (freshProducts < quantity) {
             throw new InsufficientStockException(
                     "Недостаточно товара '" + product.name() + "': запрошено "
-            + quantity + ", доступно " + totalAvailable);
+            + quantity + ", доступно " + freshProducts);
         }
 
         // Сортировка по сроку годности
@@ -81,7 +80,7 @@ public final class Warehouse {
         for (Batch batch : sorted) {
             if (remaining == 0) break;
             if (batch.isExpiredOn(onDate)) {
-                continue;
+                continue; // просроченное
             }
 
             int take = Math.min(remaining, batch.quantity());
@@ -105,6 +104,11 @@ public final class Warehouse {
 
         if (r.isExpired(now.atStartOfDay())) {
             throw new exception.ReservationTimeoutException("Резерв #" + reservationId + " истёк " + r.expires());
+        }
+
+        if (stockOn(r.product(), now) < r.quantity()) {
+            reservations.remove(r); // Резерв больше не действителен
+            throw new InsufficientStockException("Невозможно выполнить резерв #" + reservationId + ": на складе не хватает товара.");
         }
 
         // Снимаем резерв и отгружаем
@@ -173,20 +177,20 @@ public final class Warehouse {
     }
 
     //Резервирует указанное количество товара под заказ с таймаутом
-    public Reservation reserve(Product product, int quantity, LocalDate now, Duration ttl) throws WarehouseException {
+    public Reservation reserve(Product product, int quantity, LocalDate now, Duration time) throws WarehouseException {
         Objects.requireNonNull(product, "product");
         Objects.requireNonNull(now, "now");
-        Objects.requireNonNull(ttl, "ttl");
+        Objects.requireNonNull(time, "time");
         if (quantity <= 0) {
             throw new WarehouseException("Количество резерва должно быть > 0: " + quantity);
         }
-        if (ttl.isNegative() || ttl.isZero()) {
-            throw new WarehouseException("TTL должен быть положительным: " + ttl);
+        if (time.isNegative() || time.isZero()) {
+            throw new WarehouseException("Время должно быть положительным: " + time);
         }
 
         int reserved = reservations.stream().filter(r -> r.product().equals(product))
-                .mapToInt(Reservation::quantity).sum();
-        int free = stockOn(product, now) - reserved;
+                .mapToInt(Reservation::quantity).sum(); // сколько этого товара уже зарезервировано другими клиентами
+        int free = stockOn(product, now) - reserved; // свободный остаток, который можно зарезервировать
         if (free < quantity) {
             throw new InsufficientStockException(
                     "Недостаточно свободного остатка '" + product.name()
@@ -199,7 +203,7 @@ public final class Warehouse {
                 product,
                 quantity,
                 created,
-                created.plus(ttl),
+                created.plus(time),
                 now);
         reservations.add(r);
         journal.add(r);
@@ -220,16 +224,15 @@ public final class Warehouse {
     }
 
     //Снимает конкретный резерв вручную
-    public boolean cancelReservation(long reservationId, LocalDate now) {
+    public void cancelReservation(long reservationId, LocalDate now) throws WarehouseException {
         Objects.requireNonNull(now, "now");
         Optional<Reservation> found = reservations.stream().filter(r -> r.id() == reservationId)
                 .findFirst();
         if (found.isEmpty()) {
-            return false;
+            throw new WarehouseException("Резерв #" + reservationId + " не найден");
         }
         reservations.remove(found.get());
         journal.add(new ReservationCancel(reservationId, now.atStartOfDay(), now));
-        return true;
     }
 
     //Доступ ко всем партиям склада в виде списка

@@ -16,7 +16,7 @@ public enum Category {
         this.defaultStoragePeriod = defaultStoragePeriod;
     }
 
-    public TemperatureMode tempMode() {
+    public TemperatureMode getTempMode() {
         return  tempMode;
     }
 
